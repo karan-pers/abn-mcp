@@ -2,6 +2,10 @@
 
 A sample MCP server for handful of actions like fetch transactions for an IBAN and list all accounts. The server is in newer HTTP streamable mode.
 
+## Requirements
+Node v22.16.0
+pnpm
+
 ## Installation
 
 1. **Clone the repository:**
@@ -31,6 +35,22 @@ Then connect to your favorite HTTP streamable MCP client (I use VS Code - Inside
 Also provide extra headers in the MCP settings.
 ```
 "headers": { "smsession": "<your SMSession cookie here>" }
+```
+
+Eventually the MCP configuration should look like
+```
+{
+    "mcp": {
+        "servers": {
+            "abn-mcp": {
+                "url": "http://localhost:3000/mcp",
+                "headers": {
+                    "smsession": "<your cookie here>"
+                }
+            }
+        }
+    }
+}
 ```
 
 ## License

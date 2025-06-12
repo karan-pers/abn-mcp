@@ -20,8 +20,9 @@ app.post('/mcp', async (req: Request, res: Response) => {
             'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8,nl;q=0.7',
             'priority': 'u=1, i',
             'content-type': 'application/json',
-            'consumer-id': 'aabsys020419-retail-digitalshop',
-            'referer': 'https://www.abnamro.nl/mijn-abnamro/betalen/bij-en-afschrijvingen/',
+            'authorization': 'Basic bjJnN2ROVzY6MzNubUFMM3U=',
+            'consumer-id': 'AAB.SYS.024193',
+            'referer': 'https://www-et1.abnamro.nl/mijn-abnamro/betalen/bij-en-afschrijvingen/',
             'request-id': '|38e9e41efd8e46b4b3963df7d2ae1f77.07eab036015b4c8b',
             'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
             'sec-ch-ua-mobile': '?0',
@@ -90,6 +91,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
                     throw new Error(`API request failed: ${response.status} ${response.statusText}`);
                 }
                 const result = await response.json();
+                console.log(`ABN AMRO Accounts List: ${JSON.stringify(result)}`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(result) }]
                 };
