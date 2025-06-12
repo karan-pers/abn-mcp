@@ -13,7 +13,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
     try {
         const SMSession = req.headers['smsession'];
         if (!SMSession) {
-            throw new Error("SMSession is required");
+            console.log("SMSession is required");
         }
         const staticHeaders = {
             'accept': 'application/json',
@@ -73,7 +73,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
             "abnamro-accounts-list",
             "This tool fetches the list of accounts for the ABN AMRO user. The main account is called 'Personal Account'.",
             async () => {
-                const url = "https://www.abnamro.nl/my-abnamro/api/payments/contracts/list";
+                const url = "https://www-et1.abnamro.nl/my-abnamro/api/payments/contracts/list";
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: staticHeaders,
@@ -100,14 +100,16 @@ app.post('/mcp', async (req: Request, res: Response) => {
         server.registerTool(
             "abnamro-transactions",
             {
-                description: "Fetches ABN AMRO transactions for a given account number. If lastMutationKey is provided, it fetches the next page of mutations. The lastMutationKey is returned in the response and can be used to fetch older transactions.",
+                description: `Fetches ABN AMRO transactions for a given account number. 
+                Use 'lastMutationKey' from the result to fetch older transactions. If no date range is specified, fetch last 30 days of transactions.
+                Call 'abnamro-transactions' tool recursively until all transactions within this range are fetched.`,
                 inputSchema: {
                     accountNumber: z.string().describe("IBAN account number"),
-                    lastMutationKey: z.optional(z.string()).describe("lastMutationKey, used for the next page of mutations")
+                    lastMutationKey: z.string().optional().describe("lastMutationKey, used for the next page of mutations")
                 }
             },
             async ({ accountNumber, lastMutationKey }) => {
-                let url = `https://www.abnamro.nl/mutations/${accountNumber}?accountNumber=${accountNumber}&includeActions=EXTENDED`;
+                let url = `https://www-et1.abnamro.nl/mutations/${accountNumber}?accountNumber=${accountNumber}&includeActions=EXTENDED`;
                 url += lastMutationKey ? `&lastMutationKey=${lastMutationKey}` : ''
                 console.log(`Request URL: ${url}`);
                 const response = await fetch(url, {
