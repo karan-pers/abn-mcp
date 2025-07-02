@@ -11,9 +11,9 @@ app.use(express.json());
 
 app.post('/mcp', async (req: Request, res: Response) => {
     try {
-        const SMSession = req.headers['smsession'];
-        if (!SMSession) {
-            console.log("SMSession is required");
+        const cookie = req.headers['cookie'];
+        if (!cookie) {
+            console.log("Cookie is required");
         }
         const staticHeaders = {
             'accept': 'application/json',
@@ -33,7 +33,31 @@ app.post('/mcp', async (req: Request, res: Response) => {
             'traceparent': '00-38e9e41efd8e46b4b3963df7d2ae1f77-07eab036015b4c8b-01',
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
             'x-aab-serviceversion': 'v3',
-            'Cookie': `SMSession=${SMSession}`
+            'origin': 'https://www-et1.abnamro.nl',
+            'Cookie': cookie,
+        }
+
+        const chasmSpecificHeaders = {
+            'accept': 'application/json',
+            'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+            'authorization': 'Basic bjJnN2ROVzY6MzNubUFMM3U=',
+            'pii-customer-id': '3936759',
+            'priority': 'u=1, i',
+            'referer': 'https://www-et1.abnamro.nl/my-abnamro/self-service/general/index.html',
+            'request-context': 'appId=cid-v1:70813994-87b0-47ee-8856-6b6b163d1930',
+            'request-id': '|7ee349c88b8d4a6dadd2c3bce62276a0.bc0f0b693bd84050',
+            'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"macOS"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'source': 'OAM',
+            'trace-id': 'OAM1751459105472',
+            'traceparent': '00-7ee349c88b8d4a6dadd2c3bce62276a0-bc0f0b693bd84050-01',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+            'x-xsrf-header': 'test, token',
+            'cookie': cookie
         }
 
         // Create a new MCP server instance for each request
@@ -45,8 +69,8 @@ app.post('/mcp', async (req: Request, res: Response) => {
         server.tool(
             "calculate-bmi",
             {
-                weightKg: z.number(),
-                heightM: z.number()
+                weightKg: z.number().describe("Weight in kilograms"),
+                heightM: z.number().describe("Height in meters")
             },
             async ({ weightKg, heightM }) => ({
                 content: [{
@@ -56,24 +80,12 @@ app.post('/mcp', async (req: Request, res: Response) => {
             })
         );
 
-        // Async tool with external API call
-        server.tool(
-            "fetch-weather",
-            { city: z.string() },
-            async ({ city }) => {
-                const response = await fetch(`https://api.weather.com/${city}`);
-                const data = await response.text();
-                return {
-                    content: [{ type: "text", text: data }]
-                };
-            }
-        );
-
         // ABN AMRO Accounts List tool
         server.tool(
             "abnamro-accounts-list",
             "This tool fetches the list of accounts for the ABN AMRO user. The main account is called 'Personal Account'.",
-            async () => {
+            {},
+            async ({ }) => {
                 const url = "https://www-et1.abnamro.nl/my-abnamro/api/payments/contracts/list";
                 const response = await fetch(url, {
                     method: 'POST',
@@ -95,7 +107,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
                 return {
                     content: [{ type: "text", text: JSON.stringify(result) }]
                 };
-            }
+            },
         );
 
         // ABN AMRO transactions tool
@@ -103,8 +115,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
             "abnamro-transactions",
             {
                 description: `Fetches ABN AMRO transactions for a given account number. 
-                Use 'lastMutationKey' from the result to fetch older transactions. If no date range is specified, fetch last 30 days of transactions.
-                Call 'abnamro-transactions' tool recursively until all transactions within this range are fetched.`,
+                Use 'lastMutationKey' from the result to fetch older transactions.`,
                 inputSchema: {
                     accountNumber: z.string().describe("IBAN account number"),
                     lastMutationKey: z.string().optional().describe("lastMutationKey, used for the next page of mutations")
@@ -118,6 +129,76 @@ app.post('/mcp', async (req: Request, res: Response) => {
                     method: 'GET',
                     headers: staticHeaders
                 });
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                return {
+                    content: [{ type: "text", text: JSON.stringify(data) }]
+                };
+            }
+        );
+
+        // ABN AMRO tasks tool
+        server.registerTool(
+            "abnamro-tasks",
+            {
+                description: "Fetches ABN AMRO tasks for the user.",
+                inputSchema: {}
+            },
+            async () => {
+                const url = "https://www-et1.abnamro.nl/my-abnamro/apis/bapi/tasks/v2/";
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: chasmSpecificHeaders
+                });
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                return {
+                    content: [{ type: "text", text: JSON.stringify(data) }]
+                };
+            }
+        );
+
+        // ABN AMRO message cards tool
+        server.registerTool(
+            "abnamro-message-cards",
+            {
+                description: "Fetches ABN AMRO message cards for the user.",
+                inputSchema: {}
+            },
+            async () => {
+                const url = "https://www-et1.abnamro.nl/my-abnamro/api/message-card/v1/message-cards";
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: staticHeaders
+                });
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                return {
+                    content: [{ type: "text", text: JSON.stringify(data) }]
+                };
+            }
+        );
+
+        // ABN AMRO Appointments tool
+        server.registerTool(
+            "abnamro-appointments",
+            {
+                description: "Fetches ABN AMRO appointments for the user.",
+                inputSchema: {}
+            },
+            async () => {
+                const url = "https://www-et1.abnamro.nl/my-abnamro/apis/party-online-appointment-request/v1/appointments";
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: chasmSpecificHeaders
+                });
+                console.log(`OAM API request : ${response.status} ${response.statusText}`);
                 if (!response.ok) {
                     throw new Error(`API request failed: ${response.status} ${response.statusText}`);
                 }
@@ -175,7 +256,7 @@ app.delete('/mcp', async (req: Request, res: Response) => {
 });
 
 // Start the server
-const PORT = 3000;
+const PORT = 7000;
 app.listen(PORT, () => {
     console.log(`MCP Stateless Streamable HTTP Server listening on port ${PORT}`);
 });
